@@ -8,7 +8,10 @@ import { Icon } from './Icon';
 import { useT } from '../i18n';
 import { unfinishedTodosFromEvents, type TodoItem } from '../runtime/todos';
 import type { Dict } from '../i18n/types';
+import { agentDisplayName } from '../utils/agentLabels';
 import type { AgentEvent, ChatMessage, ProjectFile } from '../types';
+
+type TranslateFn = (key: keyof Dict, vars?: Record<string, string | number>) => string;
 
 interface Props {
   message: ChatMessage;
@@ -57,6 +60,7 @@ export function AssistantMessage({
     | Extract<AgentEvent, { kind: 'usage' }>
     | undefined;
   const produced = message.producedFiles ?? [];
+  const roleLabel = assistantRoleLabel(message, t);
   const unfinishedTodos = streaming ? [] : unfinishedTodosFromEvents(events);
   const canContinueTodos =
     !streaming && !!isLast && unfinishedTodos.length > 0 && !!onContinueRemainingTasks;
@@ -66,7 +70,7 @@ export function AssistantMessage({
 
   return (
     <div className="msg assistant">
-      <div className="role">{t('assistant.role')}</div>
+      <div className="role">{roleLabel}</div>
       <div className="assistant-flow">
         {blocks.length === 0 && streaming ? (
           <WaitingPill startedAt={message.startedAt} latestStatus={latestStatusLabel(events)} />
@@ -129,6 +133,15 @@ export function AssistantMessage({
       </div>
     </div>
   );
+}
+
+function assistantRoleLabel(message: ChatMessage, t: TranslateFn): string {
+  const fromMetadata = agentDisplayName(message.agentId, message.agentName);
+  if (fromMetadata) return fromMetadata;
+  const starting = message.events?.find(
+    (e) => e.kind === 'status' && e.label === 'starting' && e.detail,
+  ) as Extract<AgentEvent, { kind: 'status' }> | undefined;
+  return agentDisplayName(starting?.detail) ?? t('assistant.role');
 }
 
 function AssistantFooter({
